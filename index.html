@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat với AI - Test Mode</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; height: 100vh; margin: 0; }
+        .chat-container { width: 100%; max-width: 600px; background: white; display: flex; flex-direction: column; height: 100%; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        
+        /* Header */
+        .header { background: #0084ff; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 1.1rem; }
+
+        /* Vùng chat */
+        .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 80%; padding: 10px 15px; border-radius: 18px; line-height: 1.4; font-size: 15px; }
+        .user { align-self: flex-end; background-color: #0084ff; color: white; border-bottom-right-radius: 4px; }
+        .ai { align-self: flex-start; background-color: #e4e6eb; color: black; border-bottom-left-radius: 4px; }
+        
+        /* Hiệu ứng đang gõ */
+        .loading { display: none; align-self: flex-start; color: #888; font-size: 12px; margin-left: 10px; margin-bottom: 10px; font-style: italic; }
+
+        /* Vùng nhập liệu */
+        .input-area { padding: 15px; border-top: 1px solid #ddd; display: flex; gap: 10px; background: white; }
+        input { flex: 1; padding: 10px 15px; border-radius: 20px; border: 1px solid #ccc; outline: none; }
+        button { padding: 10px 20px; background-color: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        button:disabled { background-color: #ccc; }
+        button:hover:not(:disabled) { background-color: #0073e6; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="header">🤖 AI Chat Test</div>
+    
+    <div class="chat-box" id="chatBox">
+        <div class="message ai">Chào bạn! Mình là AI, mình có thể giúp gì cho bạn?</div>
+        <div class="loading" id="loading">AI đang suy nghĩ...</div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Nhập tin nhắn..." onkeypress="handleEnter(event)">
+        <button onclick="sendMessage()" id="sendBtn">Gửi</button>
+    </div>
+</div>
+
+<script>
+    // --- CẤU HÌNH ---
+    // Link Worker của bạn (đã điền sẵn)
+    const WORKER_URL = "https://muddy-paper-3417.nhatanhd50.workers.dev/";
+    
+    // 👇👇👇 THAY API KEY CỦA BẠN VÀO DƯỚI ĐÂY 👇👇👇
+    const API_KEY = "12345678"; 
+    // ----------------
+
+    const chatBox = document.getElementById('chatBox');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const loading = document.getElementById('loading');
+
+    // Lưu lịch sử chat (Context)
+    let history = [];
+
+    function handleEnter(e) {
+        if (e.key === 'Enter') sendMessage();
+    }
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        // 1. Hiện tin nhắn User
+        addMessage(text, 'user');
+        userInput.value = '';
+        
+        // Khóa nút gửi
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+        loading.style.display = 'block'; // Hiện chữ "đang nghĩ..."
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            // 2. Gửi lên Worker
+            const res = await fetch(WORKER_URL, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    prompt: text,
+                    history: history // Gửi kèm lịch sử để AI nhớ
+                })
+            });
+
+            if (!res.ok) throw new Error("Lỗi kết nối hoặc Sai API Key");
+
+            const data = await res.json();
+            const aiText = data.response || "Không có nội dung trả về.";
+
+            // 3. Hiện tin nhắn AI
+            addMessage(aiText, 'ai');
+            
+            // Cập nhật lịch sử
+            history.push({ role: "user", content: text });
+            history.push({ role: "assistant", content: aiText });
+
+        } catch (error) {
+            addMessage("Lỗi: " + error.message, 'ai');
+        } finally {
+            // Mở lại nút gửi
+            loading.style.display = 'none';
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+
+    function addMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `message ${sender}`;
+        // Xử lý xuống dòng cho đẹp
+        div.innerHTML = text.replace(/\n/g, "<br>");
+        
+        // Chèn tin nhắn trước cái loading
+        chatBox.insertBefore(div, loading);
+    }
+</script>
+
+</body>
+</html>
